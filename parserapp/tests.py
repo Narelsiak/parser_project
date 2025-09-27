@@ -3,6 +3,14 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 from parserapp.utils import process_uploaded_file, _shuffle_middle
+"""
+Tests for text file parsing utilities and view.
+
+Structure:
+- Unit tests verify utils.
+- View tests check form rendering, file validation, and result rendering.
+- Integration tests cover the full flow: upload → processing → response.
+"""
 
 class UtilsTests(TestCase):
     """
@@ -102,3 +110,29 @@ class ParseFileViewTests(TestCase):
         response = self.client.post(reverse("parse-file"), {"file": file})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Plik jest za duży")
+
+class IntegrationTests(TestCase):
+    """
+    Integration tests for the full upload and processing flow.
+    """
+
+    def test_upload_and_process_file_flow(self):
+        """
+        Ensure that the user can:
+        1. Open the upload form via GET
+        2. Submit a valid file via POST
+        3. Receive the processed result in the response
+        """
+        # 1. GET request -> upload form
+        get_response = self.client.get(reverse("parse-file"))
+        self.assertEqual(get_response.status_code, 200)
+
+        # 2. POST request -> valid text file
+        content = b"Integration test works fine"
+        file = SimpleUploadedFile("ok.txt", content, content_type="text/plain")
+        post_response = self.client.post(reverse("parse-file"), {"file": file})
+
+        # 3. Check if the result page is rendered
+        self.assertEqual(post_response.status_code, 200)
+        self.assertTemplateUsed(post_response, "result.html")
+        self.assertContains(post_response, "result")
