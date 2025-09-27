@@ -1,6 +1,7 @@
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
+from django.urls import reverse
 from parserapp.utils import process_uploaded_file, _shuffle_middle
 
 class UtilsTests(TestCase):
@@ -55,3 +56,49 @@ class UtilsTests(TestCase):
         file = SimpleUploadedFile("bad.txt", bad_bytes, content_type="text/plain")
         with pytest.raises(ValueError):
             process_uploaded_file(file)
+
+class ParseFileViewTests(TestCase):
+    """
+    View tests for the parse_file Django view.
+    """
+
+    def test_get_request_renders_form(self):
+        """
+        GET request should render the upload form.
+        """
+        response = self.client.get(reverse("parse-file"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "<form")
+
+    def test_post_valid_file(self):
+        """
+        POST with a valid text file should render the result page
+        and include the processed text.
+        """
+        content = b"Hello test"
+        file = SimpleUploadedFile("ok.txt", content, content_type="text/plain")
+        response = self.client.post(reverse("parse-file"), {"file": file})
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "result.html")
+        self.assertContains(response, "result")
+
+    def test_post_invalid_file_type(self):
+        """
+        POST with an invalid file type (e.g., .jpg) should render the upload page
+        with an appropriate error message.
+        """
+        file = SimpleUploadedFile("bad.jpg", b"123", content_type="image/jpeg")
+        response = self.client.post(reverse("parse-file"), {"file": file})
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "upload.html")
+        self.assertContains(response, "nie jest plikiem tekstowym")
+
+    def test_post_too_large_file(self):
+        """
+        POST with a too large file should render the upload page
+        with a size limit error message.
+        """
+        file = SimpleUploadedFile("huge.txt", b"a" * (30 * 1024 * 1024), content_type="text/plain")
+        response = self.client.post(reverse("parse-file"), {"file": file})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Plik jest za duży")
